@@ -4,6 +4,8 @@ A browser 3D off-road driving game for desktop, phone and tablet. You drive one 
 custom raycast vehicle controller running in Rapier's fixed physics timestep, through a valley with timed
 trails, mud bogs, rock gardens, fallen logs, a steep hill climb and a switchback ridge, by day or by night.
 
+**▶ Play online: https://vishal-webreach.github.io/ridgeline-4x4/** (desktop, phone or tablet)
+
 ## Run it
 
 ```bash
@@ -19,7 +21,11 @@ npm run preview      # serve the production build (also on your LAN, port 4173)
 3. Tap **Play**. The game goes fullscreen and landscape where the browser allows it. You can also use
    "Add to Home Screen" to launch it fullscreen like an app.
 
-### Hosting it online
+### Deploying
+`npm run deploy` builds the game and publishes it to the `gh-pages` branch. GitHub Pages serves it at the
+link above about a minute later.
+
+### Hosting it elsewhere
 `npm run build` produces a fully static `dist/` folder. Everything (including the physics WASM) is bundled,
 and paths are relative, so it works from any host or sub-folder: Netlify, Vercel, GitHub Pages, itch.io
 (HTML5 upload), or any web server.
