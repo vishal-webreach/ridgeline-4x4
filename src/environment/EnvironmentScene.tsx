@@ -5,6 +5,7 @@ import { Trees, Bushes, Grass, Logs } from './Vegetation'
 import { Rocks } from './Rocks'
 import { FuelStation, SummitMarker } from './Landmarks'
 import { Lighting } from './Lighting'
+import { WeatherEffects } from './WeatherEffects'
 
 /** Everything static in the world: sky, light, terrain, props. */
 export function EnvironmentScene({ world, profile }: { world: WorldData; profile: QualityProfile }) {
@@ -12,6 +13,7 @@ export function EnvironmentScene({ world, profile }: { world: WorldData; profile
   return (
     <>
       <Lighting profile={profile} />
+      <WeatherEffects drops={{ low: 1200, medium: 2400, high: 4000, ultra: 6000 }[profile.tier]} />
       <Terrain data={world.terrain} textures={world.textures} detail={profile.terrainDetail} cheap={profile.cheapMaterials} />
       <Trees trees={world.trees} shadows={shadows && profile.treeShadows} />
       <Rocks rocks={world.rocks} texture={world.textures.rock} shadows={shadows && profile.rockShadows} detail={profile.tier === 'high' ? 2 : 1} cheap={profile.cheapMaterials} />

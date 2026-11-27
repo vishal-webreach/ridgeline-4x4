@@ -11,6 +11,7 @@ export const truckMaterials = {
   headlight: new MeshStandardMaterial({ color: '#ffffff', emissive: '#fff4d6', emissiveIntensity: 0.6, roughness: 0.2 }),
   amber: new MeshStandardMaterial({ color: '#ffb340', emissive: '#ff9a1f', emissiveIntensity: 0.5, roughness: 0.3 }),
   taillight: new MeshStandardMaterial({ color: '#7a0a0a', emissive: '#ff1a10', emissiveIntensity: 0.6, roughness: 0.3 }),
+  reverse: new MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.05, roughness: 0.25 }),
   lightbar: new MeshStandardMaterial({ color: '#ffffff', emissive: '#e8f1ff', emissiveIntensity: 0.5, roughness: 0.2 }),
   tire: new MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.93, metalness: 0 }),
   rim: new MeshStandardMaterial({ color: '#2b2d30', roughness: 0.35, metalness: 0.85 }),

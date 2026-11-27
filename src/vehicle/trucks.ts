@@ -140,5 +140,6 @@ export function applyTruck(t: TruckSpec) {
   V.suspension.bumpDamping = critical * 0.36
   V.suspension.reboundDamping = critical * 0.5
   V.antiRoll = { ...t.antiRoll }
+  V.winch.point = { x: 0, y: 0.32, z: bodyDims(t).front + 0.3 }
   V.engine.torqueCurve = BASE_TORQUE_CURVE.map(([rpm, nm]) => [rpm, nm * t.torqueScale] as [number, number])
 }

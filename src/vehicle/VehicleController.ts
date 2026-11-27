@@ -8,7 +8,8 @@ import {
 } from './WheelPhysics'
 import { createWheelState, resetWheelState, type WheelState } from './wheelState'
 import { driveInput } from '../game/input'
-import { telemetry, touchInput, vehicleCommands } from '../game/runtime'
+import { sessionRules, telemetry, touchInput, vehicleCommands, winch } from '../game/runtime'
+import { findAnchor } from './winchAnchors'
 import { useGameStore } from '../game/store'
 import { getWorld } from '../environment/worldState'
 import { sampleHeight } from '../environment/terrainGenerator'
@@ -61,6 +62,8 @@ export class VehicleController {
   private point = new Vector3()
   private gravity = new Vector3(...GRAVITY)
   private prevVel = new Vector3()
+  private hook = new Vector3()
+  private winchScan = 0
   private hasPrevVel = false
 
   constructor(rapier: RapierModule) {
@@ -108,7 +111,8 @@ export class VehicleController {
     const mass = body.mass()
 
     if (this.pos.y < -80) this.recover(world, body)
-    this.updateDamage(dt)
+    if (sessionRules.damage) this.updateDamage(dt)
+    else telemetry.damage = 0
 
     this.updateDriver(dt, playing, speed)
     this.updateSteering(dt, speed)
@@ -252,6 +256,8 @@ export class VehicleController {
       this.tcs = approach(this.tcs, 1, dt * 3)
     }
 
+    this.updateWinch(body, dt, playing)
+
     // ---- aerodynamic drag ------------------------------------------------------
     const A = VEHICLE.aero
     const vMag = this.vel.length()
@@ -279,7 +285,12 @@ export class VehicleController {
     let wantThrottle = 0
     let wantBrake = 0
     const dtn = this.drivetrain
-    if (dtn.gear !== -1) {
+    dtn.manual = useGameStore.getState().transmission === 'manual'
+    if (dtn.manual) {
+      // manual gearbox: W is the throttle in any gear (R drives backwards), S is the brake
+      wantThrottle = fwdAmt
+      wantBrake = backAmt
+    } else if (dtn.gear !== -1) {
       if (fwdKey) wantThrottle = fwdAmt
       if (backKey) {
         if (speed > 0.8) wantBrake = backAmt
@@ -296,9 +307,9 @@ export class VehicleController {
     if (wantThrottle > 0.05) this.holding = false
     else if (Math.abs(speed) < BR.holdSpeed) this.holding = true
     if (this.holding) wantBrake = Math.max(wantBrake, 1)
-    // anti-rollback: no throttle and moving against the selected gear direction
+    // anti-rollback (automatic only): no throttle and moving against the selected gear direction
     const gearDir = dtn.gear === -1 ? -1 : 1
-    if (wantThrottle < 0.05 && speed * gearDir < -BR.holdSpeed) wantBrake = Math.max(wantBrake, 1)
+    if (!dtn.manual && dtn.gear !== 0 && wantThrottle < 0.05 && speed * gearDir < -BR.holdSpeed) wantBrake = Math.max(wantBrake, 1)
 
     this.throttle += (wantThrottle - this.throttle) * Math.min(1, dt * (wantThrottle > this.throttle ? 5 : 10))
     this.brake += (wantBrake - this.brake) * Math.min(1, dt * 12)
@@ -327,6 +338,47 @@ export class VehicleController {
       const turnRadius = L / Math.tan(this.steer)
       w.steerAngle = Math.atan(L / (turnRadius - w.cfg.x))
     }
+  }
+
+  /**
+   * Winch: a rope from the front fairlead to the anchor. It only pulls when
+   * taut (spring + damper, capped at the winch's rated force); reeling in
+   * shortens it, paying out lengthens it. Too much distance releases the hook.
+   */
+  private updateWinch(body: RAPIER.RigidBody, dt: number, playing: boolean) {
+    const W = VEHICLE.winch
+    this.hook.set(W.point.x, W.point.y, W.point.z).applyQuaternion(this.quat).add(this.pos)
+    winch.hook.x = this.hook.x
+    winch.hook.y = this.hook.y
+    winch.hook.z = this.hook.z
+    if (!winch.attached) {
+      winch.tension = 0
+      if (++this.winchScan % 10 === 0) winch.candidate = findAnchor(this.hook.x, this.hook.y, this.hook.z, this.fwd.x, this.fwd.z, W.maxLength)
+      return
+    }
+    winch.candidate = null
+    if (playing && (driveInput.winchIn || touchInput.winchIn)) winch.length = Math.max(1.5, winch.length - W.reelSpeed * dt)
+    if (playing && (driveInput.winchOut || touchInput.winchOut)) winch.length = Math.min(W.maxLength, winch.length + W.payoutSpeed * dt)
+    const a = winch.anchor
+    this.impulse.set(a.x - this.hook.x, a.y - this.hook.y, a.z - this.hook.z)
+    const dist = this.impulse.length()
+    if (dist > W.maxLength + 6) {
+      winch.attached = false
+      winch.tension = 0
+      useGameStore.getState().showToast('Winch cable released – too far from the anchor', 'warn')
+      return
+    }
+    if (dist <= winch.length || dist < 1e-3) {
+      winch.tension = 0 // slack rope
+      return
+    }
+    this.impulse.divideScalar(dist)
+    const v = body.velocityAtPoint(this.hook)
+    const stretchRate = -(v.x * this.impulse.x + v.y * this.impulse.y + v.z * this.impulse.z)
+    const force = clamp(W.stiffness * (dist - winch.length) + W.damping * stretchRate, 0, W.maxForce)
+    winch.tension = force
+    this.impulse.multiplyScalar(force * dt)
+    body.applyImpulseAtPoint(this.impulse, this.hook, true)
   }
 
   /** Air down (Q) / pump up (E): deflating is quick, the compressor is slower. */
@@ -368,6 +420,7 @@ export class VehicleController {
     const nearPump = Math.hypot(this.pos.x - fs.x, this.pos.z - fs.z) < F.stationRadius
     const refueling = nearPump && Math.abs(speed) < 1.5 && this.drivetrain.fuel < F.capacity
     if (refueling) this.drivetrain.fuel = Math.min(F.capacity, this.drivetrain.fuel + F.refuelRate * dt)
+    if (sessionRules.infiniteFuel) this.drivetrain.fuel = F.capacity
     const repairing = nearPump && Math.abs(speed) < 1.5 && telemetry.damage > 0
     if (repairing) telemetry.damage = Math.max(0, telemetry.damage - VEHICLE.damage.repairRate * dt)
 
@@ -426,6 +479,8 @@ export class VehicleController {
     this.groupSpin = 0
     this.hasPrevVel = false
     this.holding = true
+    winch.attached = false
+    winch.tension = 0
     this.flippedTime = 0
     this.pos.set(x, y, z)
     this.quat.copy(q)

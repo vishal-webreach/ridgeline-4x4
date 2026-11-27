@@ -3,7 +3,7 @@ import { touchInput } from '../game/runtime'
 import { useGameStore } from '../game/store'
 import { Icon } from '../ui/common'
 
-type Hold = 'left' | 'right' | 'gas' | 'brake' | 'hb' | 'down' | 'up'
+type Hold = 'left' | 'right' | 'gas' | 'brake' | 'hb' | 'down' | 'up' | 'win' | 'wout'
 
 /**
  * On-screen controls for phones and tablets. Every button tracks its own
@@ -13,11 +13,12 @@ type Hold = 'left' | 'right' | 'gas' | 'brake' | 'hb' | 'down' | 'up'
 export function TouchControls() {
   const fourWD = useGameStore((s) => s.fourWD)
   const lowRange = useGameStore((s) => s.lowRange)
+  const manual = useGameStore((s) => s.transmission === 'manual')
   const held = useRef(new Set<Hold>())
   // never leave a pedal stuck down when the controls disappear (pause, results)
   useEffect(() => () => {
     held.current.clear()
-    Object.assign(touchInput, { steer: 0, throttle: 0, brake: 0, handbrake: false, inflate: false, deflate: false })
+    Object.assign(touchInput, { steer: 0, throttle: 0, brake: 0, handbrake: false, inflate: false, deflate: false, winchIn: false, winchOut: false })
   }, [])
 
   const sync = () => {
@@ -28,6 +29,8 @@ export function TouchControls() {
     touchInput.handbrake = h.has('hb')
     touchInput.deflate = h.has('down')
     touchInput.inflate = h.has('up')
+    touchInput.winchIn = h.has('win')
+    touchInput.winchOut = h.has('wout')
   }
 
   const hold = (k: Hold) => ({
@@ -74,6 +77,19 @@ export function TouchControls() {
           <button className="tbtn small" aria-label="Inflate tyres" {...hold('up')}>PSI <Icon name="plus" /></button>
         </div>
       </div>
+
+      <div className="touch-winch">
+        <button className="tbtn small winch" {...tap(() => st().toggleWinch())}>WINCH</button>
+        <button className="tbtn small" aria-label="Reel winch in" {...hold('win')}>IN</button>
+        <button className="tbtn small" aria-label="Pay winch out" {...hold('wout')}>OUT</button>
+      </div>
+
+      {manual && (
+        <div className="touch-shift">
+          <button className="tbtn small" aria-label="Shift up" {...tap(() => st().shiftUp())}>GEAR <Icon name="plus" /></button>
+          <button className="tbtn small" aria-label="Shift down" {...tap(() => st().shiftDown())}>GEAR <Icon name="minus" /></button>
+        </div>
+      )}
 
       <div className="touch-pedals">
         <button className="tbtn hb" {...hold('hb')}>HB</button>

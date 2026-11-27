@@ -43,26 +43,25 @@ export function SceneReady() {
     const s = st.current
     const store = useGameStore.getState()
     if (!s.warmed || s.done || store.phase !== 'loading') return
-    // skip warm-up frames (the shader compile makes the first dt huge)
-    if (dt > 0.25 || s.t < 0.4) {
-      if (dt <= 0.25) s.t += dt
-      else s.t = 0
-      return
-    }
-    s.t += dt
+    // wall-clock time since warm-up (each frame counted at most 1 s) – guarantees the
+    // loading screen always finishes, even on a device that renders very slowly
+    s.t += Math.min(dt, 1)
     if (s.settle > 0) {
-      s.settle -= dt
+      s.settle -= Math.min(dt, 1)
       if (s.settle <= 0) {
         s.done = true
         store.sceneReady()
       }
       return
     }
-    s.samples.push(dt)
-    if (s.t < 1.9 || s.samples.length < 30) return
-    // median frame time: one-off stalls (component mounting, GC) don't count
+    if (s.t < 0.4) return // the first frames include the shader compile
+    if (dt <= 0.25) s.samples.push(dt)
+    const enough = (s.t >= 1.9 && s.samples.length >= 30) || s.t >= 6
+    if (!enough) return
+    // median frame time: one-off stalls (component mounting, GC) don't count;
+    // with almost no usable frames the device is very slow
     const sorted = [...s.samples].sort((a, b) => a - b)
-    const fps = 1 / Math.max(1e-3, sorted[Math.floor(sorted.length / 2)])
+    const fps = sorted.length >= 5 ? 1 / Math.max(1e-3, sorted[Math.floor(sorted.length / 2)]) : 8
     perf.fps = fps
     const profile = PROFILES[store.worldTier ?? store.tier]
     const ceiling = Math.min(profile.dprMax, window.devicePixelRatio || 1)

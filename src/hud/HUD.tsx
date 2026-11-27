@@ -6,6 +6,10 @@ import { ControlsHelp } from '../ui/ControlsHelp'
 import { Icon } from '../ui/common'
 import { timeOfDayLabel } from '../environment/Lighting'
 import { formatTime } from '../game/stages'
+import { GearLever } from './GearLever'
+import { weather, winch } from '../game/runtime'
+import { perf } from '../game/perf'
+import { WEATHER_LABELS } from '../game/weather'
 
 const PSI_MARKS: [string, number][] = [['MUD', 10], ['SAND', 16], ['GRAVEL', 24], ['ROAD', 32]]
 
@@ -16,13 +20,13 @@ const PSI_MARKS: [string, number][] = [['MUD', 10], ['SAND', 16], ['GRAVEL', 24]
  */
 export function HUD({ touch }: { touch: boolean }) {
   const fourWD = useGameStore((s) => s.fourWD)
-  const lowRange = useGameStore((s) => s.lowRange)
   const cameraMode = useGameStore((s) => s.cameraMode)
   const toast = useGameStore((s) => s.toast)
   const showHelp = useGameStore((s) => s.showHelp)
   const muted = useGameStore((s) => s.muted)
   const phase = useGameStore((s) => s.phase)
   const stageKey = useGameStore((s) => s.stageKey)
+  const showFps = useGameStore((s) => s.showFps)
   const root = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -53,8 +57,9 @@ export function HUD({ touch }: { touch: boolean }) {
       speed: q<HTMLElement>('[data-speed]'),
       rpm: q<HTMLElement>('[data-rpm]'),
       gear: q<HTMLElement>('[data-gear]'),
-      knobR: q<SVGCircleElement>('[data-knob-range]'),
-      knobG: q<SVGCircleElement>('[data-knob-gear]'),
+      weather: q<HTMLElement>('[data-weather]'),
+      winch: q<HTMLElement>('[data-winch]'),
+      fps: q<HTMLElement>('[data-fps]'),
       tcs: q<HTMLElement>('[data-tcs]'),
       alert: q<HTMLElement>('[data-alert]'),
     }
@@ -130,7 +135,17 @@ export function HUD({ touch }: { touch: boolean }) {
       style('rpm', $.rpm, 'width', `${Math.min(100, (T.rpm / VEHICLE.engine.limiterRpm) * 100).toFixed(1)}%`)
       attr('rpmRed', $.rpm, 'class', T.rpm > VEHICLE.engine.redlineRpm ? 'rpm-fill red' : 'rpm-fill')
       text('gear', $.gear, T.shifting ? '·' : T.gear === -1 ? 'R' : `D${T.gear}`)
-      attr('knobG', $.knobG, 'cy', T.gear === -1 ? '50' : T.shifting ? '33' : '16')
+      text('weather', $.weather, weather.type === 'clear' ? '' : WEATHER_LABELS[weather.type].toUpperCase())
+      text('fps', $.fps, `${Math.round(perf.fps)} FPS`)
+      // winch status / hint
+      const w = winch.attached
+        ? `WINCH ${winch.length.toFixed(1)} m · ${(winch.tension / 1000).toFixed(0)} kN${touch ? '' : '  —  V reel in · B pay out · G release'}`
+        : winch.candidate
+          ? `${touch ? 'WINCH' : 'G'}: hook ${winch.candidate.kind === 'tree' ? 'tree' : 'boulder'} ${Math.round(winch.candidate.dist)} m`
+          : ''
+      text('winch', $.winch, w)
+      style('winchD', $.winch, 'display', w ? 'block' : 'none')
+      attr('winchC', $.winch, 'class', winch.attached ? 'hud-winch on' : 'hud-winch')
       attr('tcs', $.tcs, 'class', T.tcsActive ? 'mode-chip tcs active' : 'mode-chip tcs')
       // alerts
       const alert = T.outOfFuel
@@ -148,7 +163,7 @@ export function HUD({ touch }: { touch: boolean }) {
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [stageKey])
+  }, [stageKey, showFps, touch])
 
   const store = useGameStore.getState
   const stageActive = stageRuntime.active
@@ -171,6 +186,7 @@ export function HUD({ touch }: { touch: boolean }) {
           <span data-moon style={{ display: 'none' }}><Icon name="moon" /></span>
           <b data-clock>08:00</b>
           <small data-tod>MORNING</small>
+          <small data-weather className="weather-tag" />
         </div>
         {stageActive && (
           <div className="pill stage">
@@ -183,6 +199,8 @@ export function HUD({ touch }: { touch: boolean }) {
       </div>
 
       {toast && <div key={toast.id} className={`hud-toast ${toast.tone}`}>{toast.text}</div>}
+      <div data-winch className="hud-winch" style={{ display: 'none' }} />
+      {showFps && <div data-fps className="hud-fps">— FPS</div>}
       <div data-alert className="hud-alert" style={{ display: 'none' }} />
 
       {/* bottom-left: tyres + attitude */}
@@ -248,21 +266,7 @@ export function HUD({ touch }: { touch: boolean }) {
               <span data-tcs className="mode-chip tcs">TCS</span>
             </div>
           </div>
-          <div className="gate">
-            <svg viewBox="0 0 60 66">
-              <rect className="slot" x="10" y="12" width="8" height="42" rx="4" />
-              <rect className="slot" x="40" y="12" width="8" height="42" rx="4" />
-              <rect className="slot" x="14" y="29" width="30" height="8" rx="4" />
-              <text x="3" y="20">H</text>
-              <text x="3" y="54">L</text>
-              <text x="51" y="20">A</text>
-              <text x="51" y="37">N</text>
-              <text x="51" y="54">R</text>
-              <circle data-knob-range className="knob" cx="14" cy={lowRange ? 50 : 16} r="6" />
-              <circle data-knob-gear className="knob" cx="44" cy="16" r="6" />
-            </svg>
-            <span className={`range ${lowRange ? 'low' : ''}`}>{lowRange ? 'LOW' : 'HIGH'}</span>
-          </div>
+          <GearLever />
         </div>
       </div>
 

@@ -8,7 +8,9 @@ import { useGameStore } from './store'
  * pixel ratio when frames drop below ~50 fps, raising it again after a few
  * seconds of headroom. Keeps the game smooth on slow GPUs and high-DPI phones.
  */
-export function AdaptiveResolution({ min, max }: { min: number; max: number }) {
+export function AdaptiveResolution({ min, max, cap = 0 }: { min: number; max: number; cap?: number }) {
+  // judge smoothness against the frame-rate cap when one is set
+  const target = cap > 0 ? Math.min(cap, 60) : 60
   const setDpr = useRenderDpr((s) => s.setDpr)
   const ceiling = Math.min(max, window.devicePixelRatio || 1)
   const st = useRef({ dpr: ceiling, t: 0, frames: 0, good: 0, bad: 0, cooldown: 0, warmup: 3 })
@@ -52,11 +54,11 @@ export function AdaptiveResolution({ min, max }: { min: number; max: number }) {
     // every change resizes the canvas, so act rarely: 2 s of low fps to step
     // down, and at least 5 s between changes
     s.cooldown = Math.max(0, s.cooldown - 1)
-    s.bad = fps < 47 ? s.bad + 1 : 0
-    s.good = fps > 58 ? s.good + 1 : 0
+    s.bad = fps < target * 0.78 ? s.bad + 1 : 0
+    s.good = fps > target * 0.96 ? s.good + 1 : 0
     if (s.cooldown > 0) return
     if (s.bad >= 2 && s.dpr > min + 0.01) {
-      s.dpr = Math.max(min, s.dpr - (fps < 32 ? 0.25 : 0.12))
+      s.dpr = Math.max(min, s.dpr - (fps < target * 0.55 ? 0.25 : 0.12))
       setDpr(s.dpr)
       s.bad = 0
       s.cooldown = 5

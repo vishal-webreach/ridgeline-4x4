@@ -163,6 +163,18 @@ export const VEHICLE = {
     repairRate: 0.08,
   },
 
+  /** Front winch (≈ 10 000 lb class). */
+  winch: {
+    /** fairlead position in the body frame (set per truck) */
+    point: { x: 0, y: 0.32, z: 2.9 },
+    maxForce: 45000,
+    maxLength: 35,
+    reelSpeed: 0.75,
+    payoutSpeed: 1.5,
+    stiffness: 60000,
+    damping: 9000,
+  },
+
   chassis: {
     friction: 0.6,
     restitution: 0.05,

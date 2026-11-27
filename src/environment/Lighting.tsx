@@ -6,7 +6,7 @@ import {
   type DirectionalLight, type HemisphereLight, type ShaderMaterial,
 } from 'three'
 import { vehicleRefs } from '../vehicle/vehicleRefs'
-import { lighting } from '../game/runtime'
+import { lighting, weather } from '../game/runtime'
 import { useGameStore } from '../game/store'
 import type { QualityProfile } from '../game/quality'
 import { mulberry32 } from './noise'
@@ -61,6 +61,8 @@ export function Lighting({ profile }: { profile: QualityProfile }) {
   const light = useRef<DirectionalLight>(null)
   const hemi = useRef<HemisphereLight>(null)
   const skyMat = useRef<ShaderMaterial | null>(null)
+  const skyMesh = useRef<Object3D | null>(null)
+  const grey = useMemo(() => new Color(), [])
   const target = useMemo(() => new Object3D(), [])
   const center = useMemo(() => new Vector3(), [])
   const sunDir = useMemo(() => new Vector3(), [])
@@ -116,11 +118,11 @@ export function Lighting({ profile }: { profile: QualityProfile }) {
       if (sinEl > 0) {
         lightDir.copy(sunDir)
         l.color.copy(C.sunLow).lerp(C.sunDay, smooth(0.02, 0.4, sinEl))
-        l.intensity = 3.1 * smooth(0, 0.22, sinEl)
+        l.intensity = 3.1 * smooth(0, 0.22, sinEl) * (1 - 0.72 * weather.overcast)
       } else {
         lightDir.set(0.35, 0.85, -0.4).normalize()
         l.color.copy(C.moon)
-        l.intensity = 0.45 * smooth(0, -0.12, sinEl)
+        l.intensity = 0.45 * smooth(0, -0.12, sinEl) * (1 - 0.8 * weather.overcast)
       }
       const obj = vehicleRefs.object
       if (obj) obj.getWorldPosition(center)
@@ -137,25 +139,37 @@ export function Lighting({ profile }: { profile: QualityProfile }) {
 
     const h = hemi.current
     if (h) {
-      h.intensity = 0.14 + 0.48 * daylight
+      h.intensity = (0.14 + 0.48 * daylight) * (1 - 0.25 * weather.overcast) + weather.flash * 2.5
       h.color.copy(C.skyNight).lerp(C.skyDay, daylight)
       h.groundColor.copy(C.groundNight).lerp(C.groundDay, daylight)
     }
 
     fogColor.copy(C.fogNight).lerp(C.fogGold, smooth(-0.12, 0.04, sinEl)).lerp(C.fogDay, smooth(0.06, 0.32, sinEl))
-    if (scene.fog) scene.fog.color.copy(fogColor)
-    if (profile.envMap) scene.environmentIntensity = 0.04 + 0.55 * daylight
-    gl.toneMappingExposure = 1 + 0.45 * (1 - daylight)
+    // overcast / fog / rain: grey the fog, pull it in, and hide the sky behind it
+    grey.setRGB(0.5, 0.54, 0.57).multiplyScalar(0.18 + 0.82 * daylight)
+    fogColor.lerp(grey, weather.overcast * 0.85)
+    if (weather.flash > 0) fogColor.lerp(C.skyDay, weather.flash * 0.5)
+    const fog = scene.fog as Fog | null
+    if (fog) {
+      fog.color.copy(fogColor)
+      fog.near = profile.fogNear + (12 - profile.fogNear) * weather.fog
+      fog.far = profile.fogFar + (150 - profile.fogFar) * weather.fog
+    }
+    if (skyMesh.current) skyMesh.current.visible = weather.overcast < 0.55
+    if (!scene.background || !(scene.background instanceof Color)) scene.background = new Color()
+    ;(scene.background as Color).copy(fogColor)
+    if (profile.envMap) scene.environmentIntensity = (0.04 + 0.55 * daylight) * (1 - 0.5 * weather.overcast)
+    gl.toneMappingExposure = 1 + 0.45 * (1 - daylight) + weather.flash * 1.2
 
     const starMat = stars.material as PointsMaterial
-    starMat.opacity = 1 - smooth(-0.14, 0.04, sinEl)
+    starMat.opacity = (1 - smooth(-0.14, 0.04, sinEl)) * (1 - weather.overcast)
     stars.visible = starMat.opacity > 0.01
     stars.position.copy(camera.position)
   })
 
   return (
     <>
-      <Sky ref={(s) => { skyMat.current = s?.material ?? null }} sunPosition={NOON_SUN} {...SKY} />
+      <Sky ref={(s) => { skyMat.current = s?.material ?? null; skyMesh.current = s }} sunPosition={NOON_SUN} {...SKY} />
       {profile.envMap && (
         <Environment resolution={64} frames={1} environmentIntensity={0.55}>
           {envSky}

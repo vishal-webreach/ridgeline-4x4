@@ -10,6 +10,8 @@ export const driveInput = {
   handbrake: false,
   deflate: false,
   inflate: false,
+  winchIn: false,
+  winchOut: false,
 }
 
 type DriveKey = keyof typeof driveInput
@@ -26,6 +28,8 @@ const DRIVE_KEYS: Record<string, DriveKey> = {
   Space: 'handbrake',
   KeyQ: 'deflate',
   KeyE: 'inflate',
+  KeyV: 'winchIn',
+  KeyB: 'winchOut',
 }
 
 function releaseAll() {
@@ -57,6 +61,10 @@ export function useKeyboardControls() {
         case 'KeyM': st.toggleMute(); break
         case 'KeyH': st.toggleHelp(); break
         case 'KeyN': st.toggleHeadlights(); break
+        case 'KeyG': st.toggleWinch(); break
+        case 'KeyT': st.toggleTransmission(); break
+        case 'KeyX': st.shiftUp(); break
+        case 'KeyZ': st.shiftDown(); break
         default: return
       }
       e.preventDefault()

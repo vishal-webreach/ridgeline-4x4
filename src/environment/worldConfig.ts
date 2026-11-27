@@ -23,6 +23,10 @@ export interface RoadDef {
   smoothWindow: number
   /** maximum rise/run allowed along the road */
   maxGrade: number
+  /** 0..1 – bumps, ledges and washouts carved into the trail surface */
+  roughness: number
+  /** loose stones per 10 m of trail */
+  rocks: number
   control: [number, number][]
 }
 
@@ -36,6 +40,8 @@ export const ROADS: RoadDef[] = [
     shoulder: 5,
     smoothWindow: 7,
     maxGrade: 0.2,
+    roughness: 0.18,
+    rocks: 0.15,
     control: [
       [-170, -140], [-60, -185], [60, -175], [170, -150], [205, -40], [190, 80],
       [130, 175], [0, 190], [-130, 170], [-200, 70], [-205, -50],
@@ -47,8 +53,10 @@ export const ROADS: RoadDef[] = [
     closed: false,
     halfWidth: 3.0,
     shoulder: 4,
-    smoothWindow: 5,
-    maxGrade: 0.28,
+    smoothWindow: 2,
+    maxGrade: 0.4,
+    roughness: 0.75,
+    rocks: 0.9,
     control: [[0, -176], [-20, -112], [8, -30], [-30, 40], [40, 120], [12, 186]],
   },
   {
@@ -57,8 +65,10 @@ export const ROADS: RoadDef[] = [
     closed: false,
     halfWidth: 2.9,
     shoulder: 4,
-    smoothWindow: 4,
-    maxGrade: 0.42,
+    smoothWindow: 2,
+    maxGrade: 0.48,
+    roughness: 0.6,
+    rocks: 1.0,
     control: [[128, 172], [140, 184], [185, 200], [215, 216], [186, 238], [228, 252]],
   },
   {
@@ -67,9 +77,27 @@ export const ROADS: RoadDef[] = [
     closed: false,
     halfWidth: 2.6,
     shoulder: 3.5,
-    smoothWindow: 3,
-    maxGrade: 0.5,
+    smoothWindow: 2,
+    maxGrade: 0.55,
+    roughness: 0.5,
+    rocks: 0,
     control: [[-198, 70], [-150, 78], [-100, 60], [-72, 15], [-35, -35], [15, -58], [65, -80]],
+  },
+  {
+    // narrow, rough track through the woods: roots, rocks, logs and mud
+    id: 'forest',
+    kind: 'dirt',
+    closed: false,
+    halfWidth: 2.3,
+    shoulder: 2.5,
+    smoothWindow: 1,
+    maxGrade: 0.6,
+    roughness: 1,
+    rocks: 1.3,
+    control: [
+      [-204, -48], [-178, -20], [-160, 10], [-130, 0], [-125, -30], [-150, -55], [-140, -90], [-110, -100],
+      [-92, -70], [-80, -35], [-58, -20], [-50, -50], [-62, -78], [-42, -95], [-21, -110],
+    ],
   },
 ]
 
@@ -91,6 +119,8 @@ export const FEATURES = {
     { x: -8, z: 62, r: 12 },
     { x: -150, z: 77, r: 10 },
     { x: 150, z: -155, r: 9 },
+    { x: -137, z: -42, r: 11 },
+    { x: -55, z: -64, r: 9 },
   ],
 }
 

@@ -228,16 +228,20 @@ export function CameraRig() {
     v.ray.origin = { x: v.look.x, y: v.look.y, z: v.look.z }
     v.ray.dir = { x: v.dir.x, y: v.dir.y, z: v.dir.z }
     const hit = world.castRay(v.ray, s.distance + 0.5, true, rapier.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body ?? undefined)
-    if (hit) allowed = Math.max(1.6, hit.timeOfImpact - 0.45)
+    if (hit) allowed = Math.max(2.2, hit.timeOfImpact - 0.45)
     allowed = Math.min(allowed, Math.max(1.6, foliage.clip(v.look, v.dir, s.distance) - 0.4))
     s.smoothDist = allowed < s.smoothDist ? damp(s.smoothDist, allowed, 25, dt) : damp(s.smoothDist, allowed, 2.5, dt)
 
-    v.desired.copy(v.look).addScaledVector(v.dir, s.smoothDist)
+    // tall (portrait) screens: pull back a little so the truck and the trail ahead fit
+    const portrait = Math.max(0, 1 - camera.aspect)
+    v.desired.copy(v.look).addScaledVector(v.dir, s.smoothDist * (1 + portrait * 0.45))
+    // squeezed close by a tree or bank behind: rise over the truck instead of clipping into the cab
+    if (s.smoothDist < 4.5) v.desired.y += (4.5 - s.smoothDist) * 0.9
     const ground = sampleHeight(terrain, v.desired.x, v.desired.z) + 0.6
     if (v.desired.y < ground) v.desired.y = ground
     camera.position.copy(v.desired)
     camera.lookAt(v.look)
-    const speedFov = 58 + clamp(Math.abs(telemetry.speedKmh) / 120, 0, 1) * 12
+    const speedFov = 58 + clamp(Math.abs(telemetry.speedKmh) / 120, 0, 1) * 12 + Math.max(0, 1 - camera.aspect) * 26
     camera.fov = damp(camera.fov, speedFov, 3, dt)
     camera.updateProjectionMatrix()
   })

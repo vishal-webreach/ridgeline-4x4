@@ -13,6 +13,8 @@ import { StageManager } from './StageManager'
 import { AdaptiveResolution } from './AdaptiveResolution'
 import { PROFILES } from './quality'
 import { useRenderDpr } from './perf'
+import { FrameLimiter } from './FrameLimiter'
+import { WinchVisual } from '../vehicle/WinchVisual'
 
 /**
  * Game engine root: WebGL canvas, fixed-step physics world, environment,
@@ -23,6 +25,7 @@ export function GameCanvas() {
   const phase = useGameStore((s) => s.phase)
   const tier = useGameStore((s) => s.worldTier ?? s.tier)
   const truckId = useGameStore((s) => s.truckId)
+  const fpsCap = useGameStore((s) => s.fpsCap)
   const profile = PROFILES[tier]
   // adaptive pixel ratio (see AdaptiveResolution); before the first measurement use the tier's range
   const adaptiveDpr = useRenderDpr((s) => s.dpr)
@@ -34,12 +37,14 @@ export function GameCanvas() {
   const contents = useMemo(
     () => (
       <>
-        <AdaptiveResolution min={profile.dprMin} max={profile.dprMax} />
+        <AdaptiveResolution min={profile.dprMin} max={profile.dprMax} cap={fpsCap} />
+        <FrameLimiter fps={fpsCap} />
         <Suspense fallback={null}>
           <PhysicsWorld paused={phase !== 'playing'}>
             <EnvironmentScene world={world} profile={profile} />
             <Vehicle key={truckId} profile={profile} />
             <StageManager />
+            <WinchVisual />
             <CameraRig />
             <SceneReady />
           </PhysicsWorld>
@@ -47,7 +52,7 @@ export function GameCanvas() {
         <AudioDriver />
       </>
     ),
-    [phase, profile, truckId, world],
+    [phase, profile, truckId, world, fpsCap],
   )
 
   // stable prop objects: R3F re-applies camera / gl options whenever they change identity

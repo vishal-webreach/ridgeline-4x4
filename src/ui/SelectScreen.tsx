@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useGameStore } from '../game/store'
-import { STAGES, formatTime, stageLengthKm, type Difficulty } from '../game/stages'
+import { ROAM_STARTS, STAGES, formatTime, stageLengthKm, type Difficulty } from '../game/stages'
+import { TIME_FLOWS } from '../game/store'
+import { WEATHER_LABELS } from '../game/weather'
+import { Segmented } from './MainMenu'
+import type { WeatherType } from '../game/runtime'
 import { TRUCKS, getTruck, type TruckSpec } from '../vehicle/trucks'
 import { MenuBackdrop } from './MainMenu'
 import { enterFullscreen, useTouchMode } from './common'
@@ -45,6 +49,48 @@ function StatBar({ label, value }: { label: string; value: number }) {
     <div className="stat">
       <span>{label}</span>
       <div className="stat-track"><div style={{ width: `${value * 100}%` }} /></div>
+    </div>
+  )
+}
+
+function hourText(h: number) {
+  const hh = Math.floor(h)
+  return `${String(hh).padStart(2, '0')}:${String(Math.round((h - hh) * 60)).padStart(2, '0')}`
+}
+
+/** Options for Custom Roam: where, when, weather and rules. */
+function CustomRoamPanel() {
+  const c = useGameStore((s) => s.custom)
+  const set = useGameStore((s) => s.setCustom)
+  return (
+    <div className="custom-panel" onClick={(e) => e.stopPropagation()}>
+      <h3>Custom Roam setup</h3>
+      <label className="custom-row">
+        <span>Start at</span>
+        <select value={c.start} onChange={(e) => set({ start: e.target.value })}>
+          {ROAM_STARTS.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+      </label>
+      <label className="custom-row">
+        <span>Time of day <b>{hourText(c.hour)}</b></span>
+        <input type="range" min={0} max={23.75} step={0.25} value={c.hour} onChange={(e) => set({ hour: Number(e.target.value) })} />
+      </label>
+      <div className="custom-row">
+        <span>Clock</span>
+        <Segmented<string> value={String(c.timeScale)} options={TIME_FLOWS.map((t) => String(t.scale))} labels={Object.fromEntries(TIME_FLOWS.map((t) => [String(t.scale), t.label]))} onChange={(v) => set({ timeScale: Number(v) })} />
+      </div>
+      <div className="custom-row">
+        <span>Weather</span>
+        <Segmented<WeatherType> value={c.weather} options={['clear', 'fog', 'rain', 'storm']} labels={WEATHER_LABELS} onChange={(weather) => set({ weather })} />
+      </div>
+      <div className="custom-row">
+        <span>Fuel</span>
+        <Segmented<'inf' | 'real'> value={c.infiniteFuel ? 'inf' : 'real'} options={['inf', 'real']} labels={{ inf: 'Unlimited', real: 'Realistic' }} onChange={(v) => set({ infiniteFuel: v === 'inf' })} />
+      </div>
+      <div className="custom-row">
+        <span>Damage</span>
+        <Segmented<'on' | 'off'> value={c.damage ? 'on' : 'off'} options={['on', 'off']} labels={{ on: 'On', off: 'Off' }} onChange={(v) => set({ damage: v === 'on' })} />
+      </div>
     </div>
   )
 }
@@ -99,8 +145,10 @@ export function SelectScreen() {
                 <h3>{s.name}</h3>
                 <p className="stage-region">{s.region}</p>
                 {s.id === stageId && <p className="stage-desc">{s.description} <em>Suggested tyres: {s.psi} psi.</em></p>}
+                {s.weather !== 'clear' && <span className="chip weather">{WEATHER_LABELS[s.weather]}</span>}
               </button>
             ))}
+            {stageId === 'custom' && <CustomRoamPanel />}
           </div>
         ) : (
           <div className="card-list trucks">

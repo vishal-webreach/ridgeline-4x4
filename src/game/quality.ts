@@ -3,7 +3,7 @@
  * CPU cores); the adaptive resolution system then fine-tunes the pixel ratio
  * at runtime to hold a smooth frame rate.
  */
-export type QualityTier = 'low' | 'medium' | 'high'
+export type QualityTier = 'low' | 'medium' | 'high' | 'ultra'
 export type QualitySetting = 'auto' | QualityTier
 
 export interface QualityProfile {
@@ -57,6 +57,13 @@ export const PROFILES: Record<QualityTier, QualityProfile> = {
     trees: 2600, grass: 50000, grassDistance: 105, bushes: 900, textureSize: 512, terrainDetail: 2,
     cameraFar: 1400, fogNear: 140, fogFar: 640, envMap: true, headlights: 2,
   },
+  /** "Extreme": everything maxed – for strong desktop GPUs (never picked by Auto). */
+  ultra: {
+    tier: 'ultra', dprMin: 1, dprMax: 2, antialias: true,
+    shadows: true, shadowMapSize: 4096, shadowType: 'pcf', cheapMaterials: false, shadowExtent: 70, rockShadows: true, treeShadows: true,
+    trees: 3600, grass: 90000, grassDistance: 150, bushes: 1400, textureSize: 1024, terrainDetail: 2,
+    cameraFar: 1800, fogNear: 180, fogFar: 900, envMap: true, headlights: 2,
+  },
 }
 
 export const isTouchDevice = () =>
@@ -99,4 +106,5 @@ export const QUALITY_LABELS: Record<QualitySetting, string> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
+  ultra: 'Extreme',
 }

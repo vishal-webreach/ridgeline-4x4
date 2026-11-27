@@ -132,8 +132,14 @@ export class TerrainShape {
   }
 
   /** Details applied after road carving so they also affect the trails. */
-  post(x: number, z: number, h: number, rockyW: number): number {
+  post(x: number, z: number, h: number, rockyW: number, roughW = 0): number {
     const n = this.n
+    if (roughW > 0) {
+      // trail surface: rolling bumps, ledges and washouts (wavelength ≥ 6 m so the 2 m grid resolves them)
+      const bumps = fbm(n, x * 0.14 + 41, z * 0.14 - 17, 2) * 0.42
+      const ledges = (ridged(n, x * 0.09 + 3, z * 0.09 - 8, 2) - 0.45) * 0.38
+      h += (bumps + ledges) * roughW
+    }
     if (rockyW > 0) h += (fbm(n, x * 0.32, z * 0.32, 2) * 0.32 + 0.08) * rockyW
     const RG = FEATURES.rockGarden
     const rg = Math.hypot(x - RG.x, z - RG.z)
@@ -254,6 +260,7 @@ export function buildTerrain(shape: TerrainShape, noise: SimplexNoise, roads: Ro
 
   const dirtCore = new Float32Array(count)
   const rockyCore = new Float32Array(count)
+  const roughCore = new Float32Array(count)
   const tmpDist = new Float32Array(count).fill(Infinity)
   const tmpH = new Float32Array(count)
   const touched: number[] = []
@@ -326,6 +333,7 @@ export function buildTerrain(shape: TerrainShape, noise: SimplexNoise, roads: Ro
       const core = 1 - smoothstep(def.halfWidth - 0.6, def.halfWidth + 1.4, d)
       if (def.kind === 'dirt') dirtCore[v] = Math.max(dirtCore[v], core)
       else rockyCore[v] = Math.max(rockyCore[v], core)
+      roughCore[v] = Math.max(roughCore[v], (1 - smoothstep(def.halfWidth, def.halfWidth + 2.5, d)) * def.roughness)
       t.roadDist[v] = Math.min(t.roadDist[v], d - def.halfWidth)
       tmpDist[v] = Infinity
     }
@@ -360,7 +368,7 @@ export function buildTerrain(shape: TerrainShape, noise: SimplexNoise, roads: Ro
     const z = -half + iz * cell
     for (let ix = 0; ix < row; ix++) {
       const v = iz * row + ix
-      H[v] = shape.post(-half + ix * cell, z, H[v], rockyCore[v])
+      H[v] = shape.post(-half + ix * cell, z, H[v], rockyCore[v], roughCore[v])
     }
   }
 

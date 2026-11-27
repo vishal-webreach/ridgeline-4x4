@@ -1,6 +1,7 @@
 import { sampleSurfaceWeights } from '../environment/terrainGenerator'
 import { getWorld } from '../environment/worldState'
 import { SURFACES, Surface } from '../environment/worldConfig'
+import { weather } from '../game/runtime'
 
 /**
  * Maps Rapier collider handles to a surface type. The terrain collider is
@@ -44,13 +45,14 @@ export function surfaceAt(handle: number, x: number, z: number, pressure01: numb
       mu += weights[i] * (s.mu + s.airDown * air)
       rolling += weights[i] * s.rolling
     }
-    out.mu = mu
-    out.rolling = rolling * (1 + 0.9 * air)
+    // rain makes everything slippery – mud most of all
+    out.mu = mu * (1 - weather.wetness * (0.12 + 0.14 * weights[3]))
+    out.rolling = rolling * (1 + 0.9 * air) * (1 + weather.wetness * 0.25 * weights[3])
     out.mud = weights[3]
     return out
   }
   const s = SURFACES[v ?? Surface.Dirt]
-  out.mu = s.mu + s.airDown * air
+  out.mu = (s.mu + s.airDown * air) * (1 - weather.wetness * 0.12)
   out.rolling = s.rolling * (1 + 0.9 * air)
   out.mud = 0
   return out

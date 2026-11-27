@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 import { generateWorld } from '../environment/worldGen'
 import { getWorld, hasWorld, setCurrentWorld } from '../environment/worldState'
-import { lighting, stageRuntime, telemetry, vehicleCommands } from './runtime'
+import { lighting, sessionRules, stageRuntime, telemetry, vehicleCommands, winch, type WeatherType } from './runtime'
 import { engineAudio } from '../audio/EngineAudio'
 import { resolveTier, isTouchDevice, type QualitySetting, type QualityTier } from './quality'
-import { STAGES, buildRoute, getStage, loadBestTimes, makeCheckpoints, saveBestTime } from './stages'
+import { ROAM_STARTS, STAGES, buildRoute, getStage, loadBestTimes, makeCheckpoints, roamStartPlacement, saveBestTime } from './stages'
+import { setWeather } from './weather'
+import { vehicleRefs } from '../vehicle/vehicleRefs'
 import { applyTruck, getTruck, type TruckId } from '../vehicle/trucks'
 import { VEHICLE } from '../vehicle/vehicleConfig'
 
@@ -18,6 +20,25 @@ export const CAMERA_LABELS: Record<CameraMode, string> = {
   cinematic: 'Cinematic',
 }
 export type TouchSetting = 'auto' | 'on' | 'off'
+export type Transmission = 'auto' | 'manual'
+/** 0 = follow the display refresh rate (V-Sync) */
+export const FPS_CAPS = [0, 30, 45, 60, 90, 120] as const
+export type FpsCap = (typeof FPS_CAPS)[number]
+
+export interface CustomRoam {
+  start: string
+  hour: number
+  /** game hours per real second */
+  timeScale: number
+  weather: WeatherType
+  infiniteFuel: boolean
+  damage: boolean
+}
+export const TIME_FLOWS: { label: string; scale: number }[] = [
+  { label: 'Frozen', scale: 0 },
+  { label: 'Normal', scale: 1 / 60 },
+  { label: 'Fast ×10', scale: 1 / 6 },
+]
 
 /** Transfer case may only be shifted between HIGH and LOW below this speed. */
 export const LOW_RANGE_MAX_SHIFT_KMH = 8
@@ -56,12 +77,25 @@ interface GameState {
   truckId: TruckId
   result: StageResult | null
   bestTimes: Record<string, number>
+  transmission: Transmission
+  fpsCap: FpsCap
+  showFps: boolean
+  custom: CustomRoam
   /** bumps whenever a stage (re)starts – remounts the checkpoint gates */
   stageKey: number
 
   setQuality: (q: QualitySetting) => void
   setTouchSetting: (t: TouchSetting) => void
   setStage: (id: string) => void
+  setFpsCap: (fps: FpsCap) => void
+  setShowFps: (on: boolean) => void
+  setCustom: (patch: Partial<CustomRoam>) => void
+  toggleTransmission: () => void
+  shiftUp: () => void
+  shiftDown: () => void
+  /** manual lever position: -1 = R, 0 = N, 1..5 (manual) or 1 = D (auto) */
+  setGear: (gear: number) => void
+  toggleWinch: () => void
   setTruck: (id: TruckId) => void
   openSelect: () => void
   startStage: () => Promise<void>
@@ -90,26 +124,39 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined
 const SETTINGS_KEY = 'ridgeline.settings'
 const saved = (() => {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<{ quality: QualitySetting; touch: TouchSetting; muted: boolean; truck: TruckId }>
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') as Partial<{
+      quality: QualitySetting; touch: TouchSetting; muted: boolean; truck: TruckId
+      transmission: Transmission; fpsCap: FpsCap; showFps: boolean; custom: CustomRoam
+    }>
   } catch {
     return {}
   }
 })()
 const persist = (s: GameState) => {
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ quality: s.qualitySetting, touch: s.touchSetting, muted: s.muted, truck: s.truckId }))
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      quality: s.qualitySetting, touch: s.touchSetting, muted: s.muted, truck: s.truckId,
+      transmission: s.transmission, fpsCap: s.fpsCap, showFps: s.showFps, custom: s.custom,
+    }))
   } catch {
     // ignore
   }
 }
 
 /** Puts the truck at the start of the selected stage and resets the stage clock. */
-function prepareStage(stageId: string) {
+function prepareStage(stageId: string, custom: CustomRoam) {
   const world = getWorld()
   const stage = getStage(stageId)
   const route = buildRoute(world.roads, stage)
-  lighting.hours = stage.startHour
+  const isCustom = stage.id === 'custom'
+  lighting.hours = isCustom ? custom.hour : stage.startHour
+  lighting.timeScale = isCustom ? custom.timeScale : 1 / 60
   lighting.manualHeadlights = null
+  setWeather(isCustom ? custom.weather : stage.weather, true)
+  sessionRules.infiniteFuel = isCustom && custom.infiniteFuel
+  sessionRules.damage = !isCustom || custom.damage
+  winch.attached = false
+  winch.candidate = null
   telemetry.damage = 0
   telemetry.tirePressure = VEHICLE.tirePressure.default
   Object.assign(stageRuntime, {
@@ -122,6 +169,10 @@ function prepareStage(stageId: string) {
     const k = Math.min(4, route.pts.length / 2 - 1)
     const yaw = Math.atan2(route.pts[k * 2] - route.pts[0], route.pts[k * 2 + 1] - route.pts[1])
     vehicleCommands.placeAt = { x: route.pts[0], z: route.pts[1], yaw, refuel: true }
+  } else if (isCustom) {
+    const start = ROAM_STARTS.find((r) => r.id === custom.start) ?? ROAM_STARTS[0]
+    const p = roamStartPlacement(world.roads, start, world.spawn)
+    vehicleCommands.placeAt = { ...p, refuel: true }
   } else {
     const s = world.spawn
     vehicleCommands.placeAt = { x: s.x, z: s.z, yaw: s.yaw, refuel: true }
@@ -150,6 +201,10 @@ export const useGameStore = create<GameState>()((set, get) => ({
   result: null,
   bestTimes: loadBestTimes(),
   stageKey: 0,
+  transmission: saved.transmission ?? 'auto',
+  fpsCap: saved.fpsCap ?? 0,
+  showFps: saved.showFps ?? false,
+  custom: saved.custom ?? { start: 'basecamp', hour: 12, timeScale: 1 / 60, weather: 'clear', infiniteFuel: true, damage: false },
 
   setQuality: (qualitySetting) => {
     set({ qualitySetting, tier: resolveTier(qualitySetting) })
@@ -160,6 +215,50 @@ export const useGameStore = create<GameState>()((set, get) => ({
     persist(get())
   },
   setStage: (stageId) => set({ stageId }),
+  setFpsCap: (fpsCap) => {
+    set({ fpsCap })
+    persist(get())
+  },
+  setShowFps: (showFps) => {
+    set({ showFps })
+    persist(get())
+  },
+  setCustom: (patch) => {
+    set({ custom: { ...get().custom, ...patch } })
+    persist(get())
+  },
+  toggleTransmission: () => {
+    const transmission = get().transmission === 'auto' ? 'manual' : 'auto'
+    set({ transmission })
+    persist(get())
+    get().showToast(transmission === 'manual' ? (isTouchDevice() ? 'Manual gearbox – drag the lever or GEAR + / −' : 'Manual gearbox – X / Z or drag the lever') : 'Automatic gearbox')
+  },
+  shiftUp: () => {
+    const c = vehicleRefs.controller
+    if (c) c.drivetrain.shiftManual(get().transmission === 'manual' ? c.drivetrain.leverGear + 1 : Math.min(1, c.drivetrain.leverGear + 1), get().transmission)
+  },
+  shiftDown: () => {
+    const c = vehicleRefs.controller
+    if (c) c.drivetrain.shiftManual(c.drivetrain.leverGear - 1, get().transmission)
+  },
+  setGear: (gear) => {
+    const c = vehicleRefs.controller
+    if (c) c.drivetrain.shiftManual(gear, get().transmission)
+  },
+  toggleWinch: () => {
+    if (winch.attached) {
+      winch.attached = false
+      get().showToast('Winch released')
+    } else if (winch.candidate) {
+      const a = winch.candidate
+      winch.anchor = { x: a.x, y: a.y, z: a.z, kind: a.kind }
+      winch.length = a.dist
+      winch.attached = true
+      get().showToast(`Winch hooked to ${a.kind === 'tree' ? 'a tree' : 'a boulder'} · ${Math.round(a.dist)} m – hold V to reel in`, 'good')
+    } else {
+      get().showToast('No tree or boulder in reach ahead (max 35 m)', 'warn')
+    }
+  },
   setTruck: (truckId) => {
     set({ truckId })
     persist(get())
@@ -183,7 +282,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
     // world already loaded for this quality tier: start immediately
     if (st.worldReady && st.worldTier === st.tier && hasWorld()) {
-      prepareStage(st.stageId)
+      prepareStage(st.stageId, st.custom)
       set({ phase: 'playing', stageKey: get().stageKey + 1 })
       engineAudio.resume()
       return
@@ -194,7 +293,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
       const world = await generateWorld(st.tier, (p, label) => set({ loadingProgress: p, loadingLabel: label }))
       if (get().phase !== 'loading') return
       setCurrentWorld(world)
-      prepareStage(get().stageId)
+      prepareStage(get().stageId, get().custom)
       set({ stageKey: get().stageKey + 1, worldReady: true, worldTier: st.tier, loadingProgress: 0.9, loadingLabel: 'Compiling shaders and starting physics…' })
     } catch (err) {
       console.error(err)
@@ -221,7 +320,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   },
 
   retryStage: () => {
-    prepareStage(get().stageId)
+    prepareStage(get().stageId, get().custom)
     set({ phase: 'playing', result: null, lowRange: false, fourWD: true, stageKey: get().stageKey + 1 })
     engineAudio.resume()
   },

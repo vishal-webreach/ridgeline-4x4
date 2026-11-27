@@ -18,6 +18,8 @@ class EngineAudio {
   private skidGain!: GainNode
   private skidFilter!: BiquadFilterNode
   private windGain!: GainNode
+  private rainGain!: GainNode
+  private noiseBuf!: AudioBuffer
   private muted = false
 
   start() {
@@ -63,7 +65,8 @@ class EngineAudio {
     this.osc3.connect(g3).connect(this.engineFilter)
 
     const noise = ctx.createBufferSource()
-    noise.buffer = makeNoiseBuffer(ctx)
+    this.noiseBuf = makeNoiseBuffer(ctx)
+    noise.buffer = this.noiseBuf
     noise.loop = true
 
     // intake roar
@@ -91,6 +94,14 @@ class EngineAudio {
     this.windGain.gain.value = 0
     noise.connect(windFilter).connect(this.windGain).connect(this.master)
 
+    // rain hiss
+    const rainFilter = ctx.createBiquadFilter()
+    rainFilter.type = 'highpass'
+    rainFilter.frequency.value = 1800
+    this.rainGain = ctx.createGain()
+    this.rainGain.gain.value = 0
+    noise.connect(rainFilter).connect(this.rainGain).connect(this.master)
+
     this.osc1.start()
     this.osc2.start()
     this.osc3.start()
@@ -116,6 +127,31 @@ class EngineAudio {
     const v = Math.abs(speedKmh)
     this.skidGain.gain.setTargetAtTime(slip * Math.min(1, v / 10 + 0.3) * 0.22, t, 0.06)
     this.windGain.gain.setTargetAtTime(Math.min(0.35, (v / 130) ** 2 * 0.35), t, 0.2)
+  }
+
+  setRain(intensity: number) {
+    if (!this.ctx || this.ctx.state !== 'running') return
+    this.rainGain.gain.setTargetAtTime(intensity * 0.16, this.ctx.currentTime, 0.3)
+  }
+
+  /** Rolling thunder: low-passed noise burst with a slow decay. */
+  thunder(delay: number) {
+    const ctx = this.ctx
+    if (!ctx || ctx.state !== 'running') return
+    const t = ctx.currentTime + delay
+    const src = ctx.createBufferSource()
+    src.buffer = this.noiseBuf
+    src.loop = true
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 220
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(0.9, t + 0.08)
+    g.gain.exponentialRampToValueAtTime(0.001, t + 3.5)
+    src.connect(lp).connect(g).connect(this.master)
+    src.start(t)
+    src.stop(t + 3.6)
   }
 
   setMuted(m: boolean) {

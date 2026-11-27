@@ -321,3 +321,75 @@ kbd {
   .hud.desktop .hud-br { transform: scale(0.8); transform-origin: bottom right; }
   .controls-row { grid-template-columns: 8rem 1fr; }
 }
+
+/* ------------------------------------------------------------------ gear lever */
+.lever { display: flex; gap: 0.45rem; align-items: center; }
+.lever-mode { display: grid; gap: 0.3rem; }
+.lever-mode button {
+  appearance: none; width: 1.9rem; height: 1.9rem; border-radius: 0.45rem; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35); color: var(--text); font: 900 0.8rem var(--font); cursor: pointer; touch-action: manipulation;
+}
+.lever-mode button.on { background: var(--good); color: #0d2312; border-color: transparent; }
+.lever-mode button.on.warn { background: var(--accent); color: #241605; }
+.lever-gate { position: relative; display: flex; gap: 0.35rem; padding: 0.7rem 0; }
+.lever-labels { position: relative; width: 0.9rem; height: 100%; }
+.lever-labels span {
+  position: absolute; left: 0; transform: translateY(-50%); font: 800 0.7rem var(--font); color: var(--muted);
+  cursor: pointer; pointer-events: auto; padding: 0.1rem;
+}
+.lever-track {
+  position: relative; width: 1.15rem; height: 100%; border-radius: 0.6rem; background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15); touch-action: none; cursor: grab; pointer-events: auto;
+}
+.lever-knob {
+  position: absolute; left: 50%; top: 0; width: 1.55rem; height: 1.55rem; margin: -0.775rem 0 0 -0.775rem; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff, #c9cbc6 60%, #8e918b); box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.5);
+  transition: top 0.12s ease-out; pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ winch, fps, weather */
+.hud-winch {
+  position: absolute; top: calc(9.6rem + var(--safe-t)); left: 50%; transform: translateX(-50%); padding: 0.45rem 0.9rem;
+  border-radius: 0.7rem; background: var(--bg); border: 1px solid rgba(240, 166, 58, 0.5); font: 700 0.85rem var(--font); white-space: nowrap;
+}
+.hud-winch.on { border-color: var(--accent); background: rgba(80, 48, 10, 0.78); }
+.hud-fps {
+  position: absolute; bottom: calc(0.4rem + var(--safe-b)); left: 50%; transform: translateX(-50%); font: 800 0.75rem var(--font);
+  color: var(--accent-2); background: rgba(0, 0, 0, 0.45); padding: 0.15rem 0.5rem; border-radius: 0.4rem;
+}
+.weather-tag { color: #9cc7ff !important; }
+.weather-tag:empty { display: none; }
+.chip.weather { display: inline-block; margin-top: 0.45rem; background: #24507a; }
+
+/* ------------------------------------------------------------------ custom roam */
+.custom-panel { grid-column: 1 / -1; padding: 0.9rem 1rem; border-radius: 0.9rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); display: grid; gap: 0.6rem; }
+.custom-panel h3 { margin: 0; font-size: 0.85rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-2); }
+.custom-row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; font-weight: 600; font-size: 0.9rem; }
+.custom-row select { background: #1b2124; color: var(--text); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.4rem 0.6rem; font: 600 0.9rem var(--font); }
+.custom-row input[type='range'] { flex: 1; min-width: 10rem; accent-color: var(--accent); }
+
+/* ------------------------------------------------------------------ touch: winch + manual shift */
+.touch-winch { position: absolute; right: calc(1.2rem + var(--safe-r)); bottom: calc(15rem + var(--safe-b)); display: flex; gap: 0.5rem; }
+.tbtn.winch { border-color: rgba(240, 166, 58, 0.8); }
+.touch-shift { position: absolute; right: calc(18.2rem + var(--safe-r)); bottom: calc(1.2rem + var(--safe-b)); display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* ------------------------------------------------------------------ portrait (phones & tablets held upright) */
+@media (orientation: portrait) {
+  .hud.touch .hud-tc { top: calc(3.9rem + var(--safe-t)); flex-wrap: wrap; justify-content: center; width: 96vw; }
+  .hud.touch .hud-bl { top: calc(7.6rem + var(--safe-t)); left: calc(0.4rem + var(--safe-l)); transform: scale(0.74); }
+  .hud.touch .hud-br { top: calc(7.6rem + var(--safe-t)); right: calc(0.4rem + var(--safe-r)); transform: scale(0.74); flex-direction: column; align-items: flex-end; }
+  .hud.touch .hud-winch { top: auto; bottom: calc(19rem + var(--safe-b)); }
+  .hud.touch .hud-toast { bottom: calc(22rem + var(--safe-b)); }
+  .hud.touch .hud-alert { bottom: calc(25rem + var(--safe-b)); }
+  .tbtn.steer { width: 5.8rem; height: 5.8rem; }
+  .touch-shift { right: auto; left: calc(1.2rem + var(--safe-l)); bottom: calc(8.6rem + var(--safe-b)); flex-direction: row; }
+  .select-card { padding: 0.9rem; }
+  .steps { flex-wrap: wrap; }
+}
+@media (orientation: portrait) and (max-width: 520px) {
+  .hud.touch .hud-bl { transform: scale(0.64); }
+  .hud.touch .hud-br { transform: scale(0.64); }
+  .touch-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 17rem; }
+  .touch-winch { bottom: calc(18.2rem + var(--safe-b)); }
+  .hud.touch .hud-winch { bottom: calc(22rem + var(--safe-b)); }
+}

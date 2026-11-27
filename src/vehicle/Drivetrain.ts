@@ -27,8 +27,10 @@ export function engineTorqueAt(rpm: number): number {
  * Produces the total drive torque at the wheels from throttle and wheel speed.
  */
 export class Drivetrain {
-  /** -1 = reverse, 1..5 forward */
+  /** -1 = reverse, 0 = neutral, 1..5 forward */
   gear = 1
+  /** manual gearbox: no automatic shifting */
+  manual = false
   rpm = E.idleRpm
   fuel: number = F.capacity
   shifting = false
@@ -56,7 +58,43 @@ export class Drivetrain {
   }
 
   get gearLabel(): string {
-    return this.gear === -1 ? 'R' : String(this.gear)
+    return this.gear === -1 ? 'R' : this.gear === 0 ? 'N' : String(this.gear)
+  }
+
+  /** Where the gear lever sits (the gear being shifted into counts). */
+  get leverGear(): number {
+    return this.shifting ? this.pendingGear : this.gear
+  }
+
+  get maxGear() {
+    return T.ratios.length - 1
+  }
+
+  /**
+   * Lever input. Manual: any of R, N, 1–5 (sequential +/- or dragging the lever).
+   * Automatic: R, N or D (1).
+   */
+  shiftManual(target: number, mode: 'auto' | 'manual') {
+    if (mode === 'auto') {
+      const g = target < 0 ? -1 : target === 0 ? 0 : 1
+      if (g === -1 || g === 0) {
+        this.gear = this.pendingGear = g
+        this.shifting = false
+      } else if (this.gear <= 0) {
+        this.gear = this.pendingGear = 1
+        this.shifting = false
+      }
+      return
+    }
+    const g = Math.max(-1, Math.min(this.maxGear, Math.round(target)))
+    if (g === this.leverGear) return
+    if (g <= 0 || this.gear <= 0) {
+      // into / out of reverse and neutral: no shift delay needed
+      this.gear = this.pendingGear = g
+      this.shifting = false
+      return
+    }
+    this.beginShift(g)
   }
 
   /** Driver selects drive direction (only called when nearly stopped). */
@@ -84,7 +122,8 @@ export class Drivetrain {
     // engine speed implied by the wheels (turbine side of the torque converter)
     const turbineRpm = Math.max(0, wheelOmega * dir) * ratio * RAD_TO_RPM
     // the converter lets the engine run above the turbine speed, up to stall
-    const freeRpm = E.idleRpm + throttle * (E.stallRpm - E.idleRpm)
+    // (in neutral the engine revs freely)
+    const freeRpm = E.idleRpm + throttle * ((this.gear === 0 ? E.redlineRpm : E.stallRpm) - E.idleRpm)
     const targetRpm = outOfFuel ? Math.max(0, turbineRpm) : Math.max(turbineRpm, freeRpm)
     this.rpm += (targetRpm - this.rpm) * (1 - Math.exp(-dt * E.responsiveness))
     this.rpm = clamp(this.rpm, outOfFuel ? 0 : E.idleRpm * 0.9, E.limiterRpm + 150)
@@ -128,7 +167,7 @@ export class Drivetrain {
       }
       return
     }
-    if (this.gear < 1 || this.cooldown > 0) return
+    if (this.manual || this.gear < 1 || this.cooldown > 0) return
     const rpmIn = (g: number) => Math.max(0, groundOmega) * this.ratio(g, lowRange) * RAD_TO_RPM
     const up = lerp(T.upshift[0], T.upshift[1], throttle)
     const down = lerp(T.downshift[0], T.downshift[1], throttle)

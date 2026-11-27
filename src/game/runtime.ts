@@ -95,4 +95,51 @@ export const touchInput = {
   handbrake: false,
   inflate: false,
   deflate: false,
+  winchIn: false,
+  winchOut: false,
+}
+
+export type WeatherType = 'clear' | 'fog' | 'rain' | 'storm'
+
+/** Current weather. `type` is the target; the numbers ease toward it. */
+export const weather = {
+  type: 'clear' as WeatherType,
+  /** 0..1 rain intensity */
+  rain: 0,
+  /** 0..1 extra fog */
+  fog: 0,
+  /** 0..1 surface wetness (lowers grip) */
+  wetness: 0,
+  /** 0..1 cloud cover (dims the sun, hides the sky) */
+  overcast: 0,
+  /** lightning flash brightness, decays quickly */
+  flash: 0,
+}
+
+/** Per-session rules (Custom Roam can change them). */
+export const sessionRules = {
+  infiniteFuel: false,
+  damage: true,
+}
+
+export interface WinchAnchor {
+  x: number
+  y: number
+  z: number
+  kind: 'tree' | 'rock'
+  dist: number
+}
+
+/** Winch: cable from the front bumper to a tree or boulder. */
+export const winch = {
+  attached: false,
+  anchor: { x: 0, y: 0, z: 0, kind: 'tree' } as Omit<WinchAnchor, 'dist'>,
+  /** paid-out cable length (m) */
+  length: 0,
+  /** current cable tension (N) */
+  tension: 0,
+  /** nearest usable anchor in front of the truck */
+  candidate: null as WinchAnchor | null,
+  /** world position of the winch fairlead (for the cable visual) */
+  hook: { x: 0, y: 0, z: 0 },
 }

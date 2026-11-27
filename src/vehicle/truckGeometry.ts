@@ -15,7 +15,7 @@ import { bodyDims, type TruckSpec } from './trucks'
 
 export type MatKey =
   | 'paint' | 'trim' | 'plastic' | 'steel' | 'chrome' | 'frame' | 'glass' | 'headlight' | 'amber'
-  | 'taillight' | 'lightbar' | 'bedLiner' | 'tire' | 'rim' | 'rimAccent' | 'case' | 'boards' | 'red'
+  | 'taillight' | 'reverse' | 'lightbar' | 'bedLiner' | 'tire' | 'rim' | 'rimAccent' | 'case' | 'boards' | 'red'
 
 type P2 = [number, number]
 type V3 = [number, number, number]
@@ -214,8 +214,13 @@ export function buildTruck(spec: TruckSpec): TruckVisual {
   b.box('steel', [W + 0.08, 0.22, 0.24], [0, 0.24, rear - 0.12])
   b.tube('chrome', [-0.6, 0.06, rear + 0.12], [-0.6, 0.06, rear - 0.24], 0.04)
   for (const s of [1, -1]) {
-    if (pickup) b.box('taillight', [0.075, 0.3, 0.04], [s * (hw - 0.035), 0.8, rear - 0.012])
-    else b.box('taillight', [0.12, 0.36, 0.04], [s * (hw - 0.1), 0.72, rear - 0.01])
+    if (pickup) {
+      b.box('taillight', [0.075, 0.3, 0.04], [s * (hw - 0.035), 0.8, rear - 0.012])
+      b.box('reverse', [0.08, 0.13, 0.05], [s * (hw - 0.035), 0.58, rear - 0.016])
+    } else {
+      b.box('taillight', [0.12, 0.36, 0.04], [s * (hw - 0.1), 0.72, rear - 0.01])
+      b.box('reverse', [0.14, 0.13, 0.05], [s * (hw - 0.1), 0.47, rear - 0.014])
+    }
   }
 
   // ---- pickup bed / wagon tailgate -------------------------------------------------------

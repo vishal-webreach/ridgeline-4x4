@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore, type TouchSetting } from '../game/store'
+import { FPS_CAPS, useGameStore, type FpsCap, type TouchSetting, type Transmission } from '../game/store'
 import { detectTier, QUALITY_LABELS, type QualitySetting } from '../game/quality'
 import { ControlsHelp } from './ControlsHelp'
 import { fullscreenSupported, toggleFullscreen, useTouchMode, Icon } from './common'
@@ -23,13 +23,32 @@ export function SettingsPanel() {
   const setTouch = useGameStore((s) => s.setTouchSetting)
   const muted = useGameStore((s) => s.muted)
   const toggleMute = useGameStore((s) => s.toggleMute)
+  const fpsCap = useGameStore((s) => s.fpsCap)
+  const setFpsCap = useGameStore((s) => s.setFpsCap)
+  const showFps = useGameStore((s) => s.showFps)
+  const setShowFps = useGameStore((s) => s.setShowFps)
+  const transmission = useGameStore((s) => s.transmission)
+  const toggleTransmission = useGameStore((s) => s.toggleTransmission)
+  const fpsLabels = Object.fromEntries(FPS_CAPS.map((f) => [String(f), f === 0 ? 'V-Sync' : String(f)])) as Record<string, string>
   return (
     <div className="settings">
       <div className="setting">
         <span>Graphics</span>
-        <Segmented<QualitySetting> value={quality} options={['auto', 'low', 'medium', 'high']} labels={QUALITY_LABELS} onChange={setQuality} />
+        <Segmented<QualitySetting> value={quality} options={['auto', 'low', 'medium', 'high', 'ultra']} labels={QUALITY_LABELS} onChange={setQuality} />
       </div>
-      <p className="setting-note">Auto picked <b>{QUALITY_LABELS[detectTier()]}</b> for this device. Resolution also adapts while you drive.</p>
+      <p className="setting-note">Auto picked <b>{QUALITY_LABELS[detectTier()]}</b> for this device. <b>Extreme</b> is for strong gaming GPUs. Resolution also adapts while you drive.</p>
+      <div className="setting">
+        <span>FPS limit</span>
+        <Segmented<string> value={String(fpsCap)} options={FPS_CAPS.map(String)} labels={fpsLabels} onChange={(v) => setFpsCap(Number(v) as FpsCap)} />
+      </div>
+      <div className="setting">
+        <span>Show FPS</span>
+        <Segmented<'on' | 'off'> value={showFps ? 'on' : 'off'} options={['on', 'off']} labels={{ on: 'On', off: 'Off' }} onChange={(v) => setShowFps(v === 'on')} />
+      </div>
+      <div className="setting">
+        <span>Gearbox</span>
+        <Segmented<Transmission> value={transmission} options={['auto', 'manual']} labels={{ auto: 'Automatic', manual: 'Manual' }} onChange={(v) => v !== transmission && toggleTransmission()} />
+      </div>
       <div className="setting">
         <span>Touch controls</span>
         <Segmented<TouchSetting> value={touch} options={['auto', 'on', 'off']} labels={{ auto: 'Auto', on: 'On', off: 'Off' }} onChange={setTouch} />

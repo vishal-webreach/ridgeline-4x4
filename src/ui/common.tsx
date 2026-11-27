@@ -20,13 +20,12 @@ export function usePortrait() {
   return portrait
 }
 
-/** Fullscreen + landscape lock (mobile browsers need a user gesture). */
+/** Fullscreen (mobile browsers need a user gesture). */
 export async function enterFullscreen() {
   const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
   try {
+    // portrait and landscape are both supported, so the orientation is not locked
     if (!document.fullscreenElement) await (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.())
-    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }
-    await orientation.lock?.('landscape')
   } catch {
     // not supported (e.g. iOS Safari) – the game still works in the browser UI
   }

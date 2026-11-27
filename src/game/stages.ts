@@ -1,5 +1,5 @@
 import { buildRoadCurves, sampleHeight, type Road, type TerrainData } from '../environment/terrainGenerator'
-import type { Checkpoint } from './runtime'
+import type { Checkpoint, WeatherType } from './runtime'
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Extreme'
 
@@ -21,6 +21,7 @@ export interface StageDef {
   /** recommended tyre pressure (psi) */
   psi: number
   tags: string[]
+  weather: WeatherType
 }
 
 export const STAGES: StageDef[] = [
@@ -34,6 +35,7 @@ export const STAGES: StageDef[] = [
     route: [{ road: 'loop', from: [-112, -166], to: [190, 80], dir: 1 }],
     psi: 30,
     tags: ['Tutorial', 'Dirt road'],
+    weather: 'clear',
   },
   {
     id: 'valley',
@@ -48,7 +50,8 @@ export const STAGES: StageDef[] = [
       { road: 'loop', from: [5, 190], to: [-130, 170], dir: 1 },
     ],
     psi: 16,
-    tags: ['Mud', 'Articulation'],
+    tags: ['Mud', 'Articulation', 'Rain'],
+    weather: 'rain',
   },
   {
     id: 'boulder',
@@ -63,7 +66,8 @@ export const STAGES: StageDef[] = [
       { points: [[65, -80], [80, -76], [96, -73], [112, -72]] },
     ],
     psi: 14,
-    tags: ['Rocks', 'Hill climb', 'Dawn'],
+    tags: ['Rocks', 'Hill climb', 'Dawn fog'],
+    weather: 'fog',
   },
   {
     id: 'ridge',
@@ -78,6 +82,7 @@ export const STAGES: StageDef[] = [
     ],
     psi: 18,
     tags: ['Steep', 'Dusk'],
+    weather: 'clear',
   },
   {
     id: 'nightcrawl',
@@ -91,7 +96,32 @@ export const STAGES: StageDef[] = [
       { road: 'loop', from: [-200, 70], to: [-130, 170], dir: -1 },
     ],
     psi: 12,
-    tags: ['Night', 'Rocks'],
+    tags: ['Night', 'Rocks', 'Fog'],
+    weather: 'fog',
+  },
+  {
+    id: 'forest',
+    name: 'Forest Track',
+    region: 'Roots · logs · mud · rain',
+    description: 'A narrow, rutted track through the woods. Logs across the trail, stones everywhere and two mud holes. Winch out if you bog down.',
+    difficulty: 'Hard',
+    startHour: 15.5,
+    route: [{ road: 'forest', from: [-204, -48], to: [-21, -110] }],
+    psi: 12,
+    tags: ['Logs', 'Mud', 'Rain'],
+    weather: 'rain',
+  },
+  {
+    id: 'storm',
+    name: 'Midnight Storm',
+    region: 'Forest track at night, in a thunderstorm',
+    description: 'The forest track backwards at midnight in a lightning storm. Headlights on, tyres down, winch ready.',
+    difficulty: 'Extreme',
+    startHour: 23.5,
+    route: [{ road: 'forest', from: [-21, -110], to: [-204, -48] }],
+    psi: 10,
+    tags: ['Night', 'Storm', 'Mud'],
+    weather: 'storm',
   },
   {
     id: 'free',
@@ -103,8 +133,62 @@ export const STAGES: StageDef[] = [
     route: null,
     psi: 26,
     tags: ['Explore', 'Day/night'],
+    weather: 'clear',
+  },
+  {
+    id: 'custom',
+    name: 'Custom Roam',
+    region: 'Your rules',
+    description: 'Free driving with your own setup: start point, time of day, clock speed, weather, fuel and damage.',
+    difficulty: 'Easy',
+    startHour: 12,
+    route: null,
+    psi: 26,
+    tags: ['Custom'],
+    weather: 'clear',
   },
 ]
+
+/** Start points for Custom Roam. */
+export interface RoamStart {
+  id: string
+  name: string
+  /** either a road + fraction along it, or a point and a point to face */
+  road?: string
+  frac?: number
+  at?: [number, number]
+  face?: [number, number]
+}
+
+export const ROAM_STARTS: RoamStart[] = [
+  { id: 'basecamp', name: 'Base Camp' },
+  { id: 'forest', name: 'Forest Track', road: 'forest', frac: 0.02 },
+  { id: 'mudbog', name: 'Valley Mud Bog', at: [-14, -96], face: [8, -30] },
+  { id: 'rockgarden', name: 'Rock Garden', at: [-140, 62], face: [-100, 60] },
+  { id: 'hill', name: 'Hill Climb', at: [62, -73], face: [115, -72] },
+  { id: 'ridge', name: 'Ridge Summit', road: 'summit', frac: 0.96 },
+]
+
+/** World position + heading of a roam start point. */
+export function roamStartPlacement(roads: Road[], start: RoamStart, spawn: { x: number; z: number; yaw: number }) {
+  if (start.road) {
+    const r = roads.find((rd) => rd.def.id === start.road)
+    if (r) {
+      const i = Math.min(r.n - 2, Math.max(0, Math.floor((start.frac ?? 0) * (r.n - 1))))
+      const x = r.pts[i * 2]
+      const z = r.pts[i * 2 + 1]
+      const a = Math.max(0, i - 1)
+      const b = Math.min(r.n - 1, i + 1)
+      let yaw = Math.atan2(r.pts[b * 2] - r.pts[a * 2], r.pts[b * 2 + 1] - r.pts[a * 2 + 1])
+      if ((start.frac ?? 0) > 0.5) yaw += Math.PI // at the end of a road: face back down it
+      return { x, z, yaw }
+    }
+  }
+  if (start.at && start.face) {
+    return { x: start.at[0], z: start.at[1], yaw: Math.atan2(start.face[0] - start.at[0], start.face[1] - start.at[1]) }
+  }
+  return spawn
+}
 
 export const getStage = (id: string) => STAGES.find((s) => s.id === id) ?? STAGES[0]
 

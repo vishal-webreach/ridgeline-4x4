@@ -186,23 +186,30 @@ function placeRocks(t: TerrainData, shape: TerrainShape, roads: Road[], rand: Ra
     rocks.push(makeRock(t, rand, x, z, s, 0.3))
   }
 
-  // 2) rocky trail – wheel-sized stones scattered on the track
-  const rocky = roads.find((r) => r.def.id === 'rocky')!
-  for (let i = 2; i < rocky.n - 2; i += 2) {
-    const px = rocky.pts[i * 2]
-    const pz = rocky.pts[i * 2 + 1]
-    const nx = rocky.pts[(i + 1) * 2] - px
-    const nz = rocky.pts[(i + 1) * 2 + 1] - pz
-    const l = Math.hypot(nx, nz) || 1
-    const sideX = -nz / l
-    const sideZ = nx / l
-    const count = rand() < 0.5 ? 1 : 2
-    for (let c = 0; c < count; c++) {
-      const off = randRange(rand, -rocky.def.halfWidth - 1, rocky.def.halfWidth + 1)
-      const x = px + sideX * off + randRange(rand, -1, 1)
-      const z = pz + sideZ * off + randRange(rand, -1, 1)
-      if (blocked(x, z)) continue
-      rocks.push(makeRock(t, rand, x, z, randRange(rand, 0.3, 0.72), 0.35, 0.75))
+  // 2) trails – wheel-sized stones scattered on the tracks (the rocky trail is the worst)
+  for (const road of roads) {
+    const isRocky = road.def.kind === 'rocky'
+    const perSample = isRocky ? 0.75 : (road.def.rocks / 10) * road.spacing
+    if (perSample <= 0) continue
+    for (let i = 2; i < road.n - 2; i++) {
+      let count = Math.floor(perSample) + (rand() < perSample % 1 ? 1 : 0)
+      if (isRocky && i % 2) count = 0
+      if (!count) continue
+      const px = road.pts[i * 2]
+      const pz = road.pts[i * 2 + 1]
+      const nx = road.pts[(i + 1) * 2] - px
+      const nz = road.pts[(i + 1) * 2 + 1] - pz
+      const l = Math.hypot(nx, nz) || 1
+      const sideX = -nz / l
+      const sideZ = nx / l
+      for (let c = 0; c < count; c++) {
+        const off = randRange(rand, -road.def.halfWidth - 1, road.def.halfWidth + 1)
+        const x = px + sideX * off + randRange(rand, -1, 1)
+        const z = pz + sideZ * off + randRange(rand, -1, 1)
+        if (blocked(x, z)) continue
+        const big = rand() < (isRocky ? 0.3 : 0.15)
+        rocks.push(makeRock(t, rand, x, z, big ? randRange(rand, 0.7, 1.05) : randRange(rand, 0.28, 0.68), 0.38, 0.75))
+      }
     }
   }
 
@@ -234,7 +241,7 @@ function placeRocks(t: TerrainData, shape: TerrainShape, roads: Road[], rand: Ra
   }
 
   // 5) scattered boulders across the valley
-  for (let trial = 0; trial < 4000 && rocks.length < 520; trial++) {
+  for (let trial = 0; trial < 4000 && rocks.length < 780; trial++) {
     const x = randRange(rand, -lim, lim)
     const z = randRange(rand, -lim, lim)
     if (sampleField(t, t.roadDist, x, z) < 2.5) continue
@@ -245,7 +252,7 @@ function placeRocks(t: TerrainData, shape: TerrainShape, roads: Road[], rand: Ra
   }
 
   // 6) large cliffs/boulders in the boundary mountains
-  for (let trial = 0; trial < 3000 && rocks.length < 600; trial++) {
+  for (let trial = 0; trial < 3000 && rocks.length < 860; trial++) {
     const x = randRange(rand, -lim, lim)
     const z = randRange(rand, -lim, lim)
     if (shape.edgeFactor(x, z) < 0.55) continue
@@ -341,10 +348,11 @@ function placeLogs(t: TerrainData, shape: TerrainShape, roads: Road[], rand: Ran
       })
     }
   }
-  across('valley', [0.08, 0.14, 0.27, 0.46, 0.52, 0.86, 0.93])
+  across('valley', [0.08, 0.14, 0.21, 0.27, 0.38, 0.46, 0.52, 0.66, 0.74, 0.86, 0.93])
   across('rocky', [0.12, 0.34, 0.62, 0.8])
-  across('summit', [0.3, 0.7])
+  across('summit', [0.2, 0.3, 0.5, 0.7, 0.85])
   across('loop', [0.55, 0.72])
+  across('forest', [0.05, 0.12, 0.2, 0.27, 0.36, 0.44, 0.52, 0.6, 0.69, 0.77, 0.85, 0.93])
   const lim = WORLD.boundary - 10
   for (let trial = 0; trial < 3000 && logs.length < 90; trial++) {
     const x = randRange(rand, -lim, lim)

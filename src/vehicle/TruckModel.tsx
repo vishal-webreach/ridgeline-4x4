@@ -4,9 +4,9 @@ import { Object3D, type SpotLight } from 'three'
 import { buildTruck } from './truckGeometry'
 import { materialFor, truckMaterials } from './materials'
 import type { TruckSpec } from './trucks'
-import { lighting } from '../game/runtime'
+import { lighting, telemetry } from '../game/runtime'
 
-const NO_SHADOW = new Set(['glass', 'headlight', 'amber', 'taillight', 'lightbar', 'bedLiner'])
+const NO_SHADOW = new Set(['glass', 'headlight', 'amber', 'taillight', 'reverse', 'lightbar', 'bedLiner'])
 
 /**
  * Static body of the truck: merged geometry per material (≈ a dozen draw calls)
@@ -29,7 +29,11 @@ export function TruckModel({ spec, headlightCount }: { spec: TruckSpec; headligh
     for (const l of lights.current) if (l) l.intensity = k * (headlightCount === 2 ? 60 : 110)
     truckMaterials.headlight.emissiveIntensity = on ? 3 : 0.6
     truckMaterials.lightbar.emissiveIntensity = on ? 2 : 0.5
-    truckMaterials.taillight.emissiveIntensity = on ? 1.8 : 0.6
+    // tail lights: dim running lights at night, bright when braking
+    const braking = telemetry.brake > 0.2 || (telemetry.throttle < 0.05 && Math.abs(telemetry.speed) < 0.3)
+    truckMaterials.taillight.emissiveIntensity = braking ? 7 : on ? 1.6 : 0.4
+    // white reversing lights whenever reverse is selected
+    truckMaterials.reverse.emissiveIntensity = telemetry.gear === -1 ? 7 : 0.05
   })
 
   return (
