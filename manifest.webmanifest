@@ -1,0 +1,17 @@
+{
+  "name": "Ridgeline 4x4",
+  "short_name": "Ridgeline",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0d1113",
+  "theme_color": "#12171a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
